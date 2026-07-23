@@ -202,7 +202,7 @@
   }
 
   // ---- Logo SVG（紫蓝渐变图标，替代默认 brand-mark "P"）----
-var BRAND_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="22" height="18" viewBox="0 0 26 22">' +
+var BRAND_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="22" height="18" viewBox="0 0 26 22" style="display:block;">' +
   '<defs>' +
   '<linearGradient id="ai-bridge-lg1" x1="0.125" y1="0.802" x2="0.849" y2="0.29" gradientUnits="objectBoundingBox">' +
   '<stop offset="0" stop-color="#bed8ff"/><stop offset="1" stop-color="#ffcbfc"/></linearGradient>' +
@@ -219,14 +219,14 @@ var BRAND_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http:
 '</svg>';
 
 function injectLogoOverride(editor) {
-  if (!editor || !editor.shadow) return;
+  if (!editor || !editor.shadow) return false;
   // 如果已注入过，跳过
-  if (editor.shadow.querySelector('[data-logo-override]')) return;
+  if (editor.shadow.querySelector('[data-logo-override]')) return true;
   var brandMark = editor.shadow.querySelector('.brand-mark');
-  if (!brandMark) return;
+  if (!brandMark) return false;
   // 隐藏文字字母 P
   brandMark.textContent = '';
-  brandMark.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;overflow:visible;';
+  brandMark.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;overflow:visible;line-height:1;';
   brandMark.setAttribute('data-logo-override', 'true');
   // 插入 SVG
   var parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
@@ -235,8 +235,10 @@ function injectLogoOverride(editor) {
     var svgEl = doc.documentElement;
     if (svgEl) {
       brandMark.appendChild(svgEl);
+      return true;
     }
   }
+  return false;
 }
 
 // ---- 核心注入逻辑 ----
@@ -282,6 +284,8 @@ function injectLogoOverride(editor) {
     // Shadow DOM 内检查
     if (toolbar.querySelector('[data-action="send-to-ai"]')) {
       injected = true;
+      // 按钮已存在，但仍尝试注入 logo（首次加载时按钮存在但 logo 可能未注入）
+      injectLogoOverride(editor);
       return;
     }
 
@@ -398,6 +402,8 @@ function injectLogoOverride(editor) {
             retryCount = 0;
             injectButton();
           }
+          // 持续尝试注入 logo（按钮可能早已存在但 logo 未注入）
+          injectLogoOverride(editor);
         }
       }
     }, 2000);
