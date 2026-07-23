@@ -201,7 +201,45 @@
     });
   }
 
-  // ---- 核心注入逻辑 ----
+  // ---- Logo SVG（紫蓝渐变图标，替代默认 brand-mark "P"）----
+var BRAND_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="22" height="18" viewBox="0 0 26 22">' +
+  '<defs>' +
+  '<linearGradient id="ai-bridge-lg1" x1="0.125" y1="0.802" x2="0.849" y2="0.29" gradientUnits="objectBoundingBox">' +
+  '<stop offset="0" stop-color="#bed8ff"/><stop offset="1" stop-color="#ffcbfc"/></linearGradient>' +
+  '<linearGradient id="ai-bridge-lg2" x1="1" y1="0.662" x2="0" y2="0.382" gradientUnits="objectBoundingBox">' +
+  '<stop offset="0" stop-color="#ba40ff"/><stop offset="1" stop-color="#0a43ff"/></linearGradient>' +
+  '<linearGradient id="ai-bridge-lg3" y1="0.583" x2="1" y2="0.335" gradientUnits="objectBoundingBox">' +
+  '<stop offset="0" stop-color="#00439b"/><stop offset="1" stop-color="#04023b"/></linearGradient>' +
+  '</defs>' +
+  '<g fill="url(#ai-bridge-lg1)"><path d="M 15.6 21.5 L 10.4 21.5 C 4.94 21.5 0.5 17.17 0.5 11.85 L 0.5 10.15 C 0.5 4.83 4.94 0.5 10.4 0.5 L 15.6 0.5 C 21.06 0.5 25.5 4.83 25.5 10.15 L 25.5 11.85 C 25.5 17.17 21.06 21.5 15.6 21.5 Z"/></g>' +
+  '<rect width="20" height="14" rx="7" transform="translate(3 4)" fill="url(#ai-bridge-lg2)"/>' +
+  '<rect width="18" height="12" rx="6" transform="translate(4 5)" fill="url(#ai-bridge-lg3)"/>' +
+  '<rect width="3" height="6" rx="1.5" transform="translate(15 8)" fill="#fff"/>' +
+  '<rect width="3" height="6" rx="1.5" transform="translate(8 8)" fill="#fff"/>' +
+'</svg>';
+
+function injectLogoOverride(editor) {
+  if (!editor || !editor.shadow) return;
+  // 如果已注入过，跳过
+  if (editor.shadow.querySelector('[data-logo-override]')) return;
+  var brandMark = editor.shadow.querySelector('.brand-mark');
+  if (!brandMark) return;
+  // 隐藏文字字母 P
+  brandMark.textContent = '';
+  brandMark.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;overflow:visible;';
+  brandMark.setAttribute('data-logo-override', 'true');
+  // 插入 SVG
+  var parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
+  if (parser) {
+    var doc = parser.parseFromString(BRAND_LOGO_SVG, 'image/svg+xml');
+    var svgEl = doc.documentElement;
+    if (svgEl) {
+      brandMark.appendChild(svgEl);
+    }
+  }
+}
+
+// ---- 核心注入逻辑 ----
   function getEditor() {
     // 优先从 bootstrap 获取
     if (window.__htmlSlideMenderBootstrap && window.__htmlSlideMenderBootstrap.editor) {
@@ -246,6 +284,9 @@
       injected = true;
       return;
     }
+
+    // Logo 替换（紫蓝渐变图标）
+    injectLogoOverride(editor);
 
     // 创建按钮
     var btn = document.createElement('button');
