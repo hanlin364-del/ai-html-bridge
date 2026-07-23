@@ -1,5 +1,6 @@
 // ai-bridge-runtime.js
-// 娉ㄥ叆鍒?HTML Mender 缂栬緫鍣ㄩ〉闈紝鍦ㄥ伐鍏锋爮娣诲姞銆屽彂閫佸埌AI銆嶆寜閽?(function () {
+// 注入到 HTML Mender 编辑器页面，在工具栏添加「发送到AI」按钮
+(function () {
   'use strict';
 
   var BRIDGE_KEY = '__htmlMenderAiBridge';
@@ -7,7 +8,7 @@
   var retryCount = 0;
   var MAX_RETRY = 30;
 
-  // ---- 宸ュ叿鍑芥暟 ----
+  // ---- 工具函数 ----
   function getSelectorPath(el) {
     if (!el || el.nodeType !== 1) return '';
     var parts = [];
@@ -42,7 +43,7 @@
     if (!el) return '';
     var text = el.textContent || el.innerText || '';
     text = text.replace(/\s+/g, ' ').trim();
-    if (text.length > 150) text = text.slice(0, 150) + '鈥?;
+    if (text.length > 150) text = text.slice(0, 150) + '…';
     return text;
   }
 
@@ -74,20 +75,20 @@
         margin: styles.margin,
         padding: styles.padding,
       },
-      innerHTML: el.innerHTML.length > 500 ? el.innerHTML.slice(0, 500) + '鈥? : el.innerHTML,
+      innerHTML: el.innerHTML.length > 500 ? el.innerHTML.slice(0, 500) + '…' : el.innerHTML,
     };
   }
 
   function buildDescription(info) {
-    if (!info) return '娌℃湁閫変腑鍏冪礌';
+    if (!info) return '没有选中元素';
     var lines = [];
-    lines.push('馃搷 閫変腑鍏冪礌锛?' + info.tagName + '>');
+    lines.push('📍 选中元素：<' + info.tagName + '>');
     if (info.id) lines.push('  ID: #' + info.id);
     if (info.className) lines.push('  Class: .' + info.className.split(/\s+/).join('.'));
-    lines.push('  閫夋嫨鍣ㄨ矾寰? ' + info.selectorPath);
-    if (info.textSummary) lines.push('  鏂囧瓧鍐呭: ' + info.textSummary);
+    lines.push('  选择器路径: ' + info.selectorPath);
+    if (info.textSummary) lines.push('  文字内容: ' + info.textSummary);
     lines.push(
-      '  浣嶇疆: x=' +
+      '  位置: x=' +
         info.rect.x +
         ', y=' +
         info.rect.y +
@@ -97,7 +98,7 @@
         info.rect.height
     );
     lines.push(
-      '  鏍峰紡: ' +
+      '  样式: ' +
         info.styles.fontSize +
         ' / ' +
         info.styles.color +
@@ -143,7 +144,7 @@
       'font-family:Inter,system-ui,-apple-system,sans-serif;';
 
     var title = document.createElement('h3');
-    title.textContent = '閫変腑鍏冪礌淇℃伅';
+    title.textContent = '选中元素信息';
     title.style.cssText = 'margin:0 0 16px;font-size:16px;color:#1a1a1a;';
     dialog.appendChild(title);
 
@@ -159,7 +160,7 @@
     btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
 
     var copyBtn = document.createElement('button');
-    copyBtn.textContent = '馃搵 澶嶅埗';
+    copyBtn.textContent = '📋 复制';
     copyBtn.style.cssText =
       'padding:8px 16px;border:1px solid #d0d5dd;border-radius:6px;' +
       'background:#fff;color:#424242;cursor:pointer;font-size:13px;';
@@ -171,17 +172,17 @@
       selection.addRange(range);
       try {
         document.execCommand('copy');
-        copyBtn.textContent = '鉁?宸插鍒?;
+        copyBtn.textContent = '✅ 已复制';
         setTimeout(function () {
-          copyBtn.textContent = '馃搵 澶嶅埗';
+          copyBtn.textContent = '📋 复制';
         }, 1500);
       } catch (e) {
-        copyBtn.textContent = '鉂?澶嶅埗澶辫触';
+        copyBtn.textContent = '❌ 复制失败';
       }
     });
 
     var closeBtn = document.createElement('button');
-    closeBtn.textContent = '鉁?鍏抽棴';
+    closeBtn.textContent = '✕ 关闭';
     closeBtn.style.cssText =
       'padding:8px 16px;border:none;border-radius:6px;' +
       'background:#2367eb;color:#fff;cursor:pointer;font-size:13px;';
@@ -200,16 +201,17 @@
     });
   }
 
-  // ---- 鏍稿績娉ㄥ叆閫昏緫 ----
+  // ---- 核心注入逻辑 ----
   function getEditor() {
-    // 浼樺厛浠?bootstrap 鑾峰彇
+    // 优先从 bootstrap 获取
     if (window.__htmlSlideMenderBootstrap && window.__htmlSlideMenderBootstrap.editor) {
       return window.__htmlSlideMenderBootstrap.editor;
     }
-    // 鍥為€€锛氶亶鍘?HtmlSlideMenderExtension 鏌ユ壘
+    // 回退：遍历 HtmlSlideMenderExtension 查找
     var ns = window.HtmlSlideMenderExtension;
     if (ns) {
-      // 鍙兘瀛樺湪瀹炰緥灞炴€?      for (var key in ns) {
+      // 可能存在实例属性
+      for (var key in ns) {
         var val = ns[key];
         if (val && typeof val === 'object' && val.toolbar && val.selectedItem) {
           return val;
@@ -239,12 +241,13 @@
       return;
     }
 
-    // Shadow DOM 鍐呮鏌?    if (toolbar.querySelector('[data-action="send-to-ai"]')) {
+    // Shadow DOM 内检查
+    if (toolbar.querySelector('[data-action="send-to-ai"]')) {
       injected = true;
       return;
     }
 
-    // 鍒涘缓鎸夐挳
+    // 创建按钮
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.setAttribute('data-action', 'send-to-ai');
@@ -258,13 +261,14 @@
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
       'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>' +
-      '</svg>鍙戦€佸埌AI';
+      '</svg>发送到AI';
 
-    // 鎻掑叆鍒般€屼笅杞紿TML銆嶆寜閽箣鍓?    var downloadBtn = toolbar.querySelector('[data-action="download"]');
+    // 插入到「下载HTML」按钮之前
+    var downloadBtn = toolbar.querySelector('[data-action="download"]');
     if (downloadBtn && downloadBtn.parentElement) {
       downloadBtn.parentElement.insertBefore(btn, downloadBtn);
     } else {
-      // 鍥為€€锛氭壘鍒?.group-default 鎴?toolbar-body
+      // 回退：找到 .group-default 或 toolbar-body
       var group = toolbar.querySelector('.group-default') || toolbar.querySelector('.toolbar-body');
       if (group) {
         group.appendChild(btn);
@@ -273,7 +277,7 @@
       }
     }
 
-    // 鐐瑰嚮浜嬩欢
+    // 点击事件
     btn.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -282,7 +286,7 @@
       var el = item && item.element ? item.element : null;
 
       if (!el) {
-        // 灏濊瘯鑾峰彇閫変腑椤圭殑鍏朵粬鏂瑰紡
+        // 尝试获取选中项的其他方式
         var selectedId = editor.selectedId;
         if (selectedId && editor.items) {
           var it = editor.items.get(selectedId);
@@ -291,19 +295,19 @@
       }
 
       if (!el) {
-        showToast('馃憜 璇峰厛鐐瑰嚮閫変腑涓€涓〉闈㈠厓绱?);
+        showToast('👆 请先点击选中一个页面元素');
         return;
       }
 
       var info = getElementInfo(el);
       var description = buildDescription(info);
 
-      // 澶嶅埗鍒板壀璐存澘
+      // 复制到剪贴板
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard
           .writeText(description)
           .then(function () {
-            showToast('鉁?鍏冪礌淇℃伅宸插鍒讹紝鍒癆I瀵硅瘽妗?Ctrl+V 绮樿创');
+            showToast('✅ 元素信息已复制，到AI对话框 Ctrl+V 粘贴');
           })
           .catch(function () {
             showElementDialog(info, description);
@@ -312,7 +316,7 @@
         showElementDialog(info, description);
       }
 
-      // 閫氳繃 localStorage 璺ㄩ〉闈㈤€氫俊
+      // 通过 localStorage 跨页面通信
       try {
         var payload = {
           source: 'html-mender-ai-bridge',
@@ -328,10 +332,10 @@
     });
 
     injected = true;
-    console.log('[AI Bridge] 鍙戦€佸埌AI鎸夐挳宸叉敞鍏?);
+    console.log('[AI Bridge] 发送到AI按钮已注入');
   }
 
-  // ---- 鍚姩 ----
+  // ---- 启动 ----
   function start() {
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
       setTimeout(injectButton, 600);
@@ -341,12 +345,13 @@
       });
     }
 
-    // 瀹氭湡妫€鏌ユ寜閽槸鍚﹁繕瀛樺湪锛堢紪杈戝櫒鍙兘閲嶅缓宸ュ叿鏍忥級
+    // 定期检查按钮是否还存在（编辑器可能重建工具栏）
     setInterval(function () {
       if (injected) {
         var editor = getEditor();
         if (editor && editor.toolbar) {
-          // 鍦?Shadow DOM 鍐呮鏌?          var btn = editor.toolbar.querySelector('[data-action="send-to-ai"]');
+          // 在 Shadow DOM 内检查
+          var btn = editor.toolbar.querySelector('[data-action="send-to-ai"]');
           if (!btn) {
             injected = false;
             retryCount = 0;
