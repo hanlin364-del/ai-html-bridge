@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * start-editor.mjs 鈥?涓€閿惎鍔ㄥ彲瑙嗗寲 HTML 缂栬緫鍣?+ AI 妗ユ帴
+ * start-editor.mjs — 一键启动可视化 HTML 编辑器 + AI 桥接
  *
- * 鐢ㄦ硶:
+ * 用法:
  *   node start-editor.mjs <input.html> [--out <path>] [--lang zh-CN|en]
  *
- * 娴佺▼:
- *   1. 璋冪敤 html-mender skill 鐨?inject-html-editor.mjs 鐢熸垚 .editable.html
- *   2. 杩藉姞 ai-bridge-runtime.js 琛ヤ竵
- *   3. 鎵撳紑娴忚鍣? */
+ * 流程:
+ *   1. 调用 html-mender skill 的 inject-html-editor.mjs 生成 .editable.html
+ *   2. 追加 ai-bridge-runtime.js 补丁
+ *   3. 打开浏览器
+ */
 
 import { resolve, dirname, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,16 +43,16 @@ async function main() {
 
   const inputPath = resolve(args.input);
   if (!existsSync(inputPath)) {
-    console.error(`鉂?File not found: ${inputPath}`);
+    console.error(`❌ File not found: ${inputPath}`);
     process.exit(1);
   }
 
-  // 妫€鏌?html-mender skill 鏄惁瀹夎
+  // 检查 html-mender skill 是否安装
   if (!existsSync(INJECT_SCRIPT)) {
-    console.error("鉂?html-mender skill 鏈畨瑁咃紝姝ｅ湪瀹夎...");
+    console.error("❌ html-mender skill 未安装，正在安装...");
     execSync("skillhub install html-mender", { stdio: "inherit", shell: "cmd.exe" });
     if (!existsSync(INJECT_SCRIPT)) {
-      console.error("鉂?html-mender skill 瀹夎澶辫触锛岃鎵嬪姩瀹夎: skillhub install html-mender");
+      console.error("❌ html-mender skill 安装失败，请手动安装: skillhub install html-mender");
       process.exit(1);
     }
   }
@@ -62,37 +63,40 @@ async function main() {
   const outputPath = resolve(args.out || resolve(dir, `${stem}.editable${ext}`));
   await mkdir(dirname(outputPath), { recursive: true });
 
-  // Step 1: 娉ㄥ叆 HTML Mender 缂栬緫鍣?  console.log("Step 1/3: 娉ㄥ叆鍙鍖栫紪杈戝櫒...");
+  // Step 1: 注入 HTML Mender 编辑器
+  console.log("Step 1/3: 注入可视化编辑器...");
   const injectCmd = `node "${INJECT_SCRIPT}" "${inputPath}" --out "${outputPath}" --lang ${args.lang} --mode basic`;
   try {
     execSync(injectCmd, { stdio: "inherit" });
   } catch (e) {
-    console.error("鉂?缂栬緫鍣ㄦ敞鍏ュけ璐?", e.message);
+    console.error("❌ 编辑器注入失败:", e.message);
     process.exit(1);
   }
 
-  // Step 2: 杩藉姞 AI 妗ユ帴琛ヤ竵
-  console.log("Step 2/3: 娉ㄥ叆 AI 瀵硅瘽妗ユ帴...");
+  // Step 2: 追加 AI 桥接补丁
+  console.log("Step 2/3: 注入 AI 对话桥接...");
   await injectAiBridge(outputPath);
 
-  // Step 3: 鎵撳紑娴忚鍣?  console.log("Step 3/3: 鎵撳紑娴忚鍣?..");
+  // Step 3: 打开浏览器
+  console.log("Step 3/3: 打开浏览器...");
   openInBrowser(outputPath);
 
-  console.log(`\n鉁?缂栬緫鍣ㄥ凡鍚姩: ${outputPath}`);
-  console.log("\n馃搵 浣跨敤璇存槑:");
-  console.log("  1. 鍗曞嚮閫変腑椤甸潰鍏冪礌锛堟枃瀛?鍥剧墖/鍗＄墖绛夛級");
-  console.log("  2. 鍙屽嚮鎴栨寜 Enter 缂栬緫鏂囧瓧");
-  console.log("  3. 鎷栨嫿杈规绉诲姩鍏冪礌锛屾嫋鎷芥墜鏌勮皟鏁村ぇ灏?);
-  console.log("  4. 鐐广€岎煉?鍙戦€佸埌AI銆嶆寜閽紝鍏冪礌淇℃伅鑷姩澶嶅埗鍒板壀璐存澘");
-  console.log("  5. 鍥炲埌 AI 瀵硅瘽妗?Ctrl+V 绮樿创锛屽憡璇?AI 瑕佹€庝箞璋冩暣");
-  console.log("  6. 缂栬緫瀹屾垚鍚庣偣銆屼笅杞?HTML銆嶅鍑哄共鍑€婧愮爜");
+  console.log(`\n✅ 编辑器已启动: ${outputPath}`);
+  console.log("\n📋 使用说明:");
+  console.log("  1. 单击选中页面元素（文字/图片/卡片等）");
+  console.log("  2. 双击或按 Enter 编辑文字");
+  console.log("  3. 拖拽边框移动元素，拖拽手柄调整大小");
+  console.log("  4. 点「💬 发送到AI」按钮，元素信息自动复制到剪贴板");
+  console.log("  5. 回到 AI 对话框 Ctrl+V 粘贴，告诉 AI 要怎么调整");
+  console.log("  6. 编辑完成后点「下载 HTML」导出干净源码");
 }
 
 async function injectAiBridge(filePath) {
   let html = await readFile(filePath);
   const bridgeRuntime = await readFile(BRIDGE_RUNTIME);
 
-  // 绉婚櫎鏃цˉ涓?  const oldStart = html.indexOf(START_MARKER);
+  // 移除旧补丁
+  const oldStart = html.indexOf(START_MARKER);
   const oldEnd = html.indexOf(END_MARKER);
   if (oldStart >= 0 && oldEnd >= 0) {
     html = html.slice(0, oldStart) + html.slice(oldEnd + END_MARKER.length);
@@ -104,7 +108,7 @@ async function injectAiBridge(filePath) {
     END_MARKER,
   ].join("\n");
 
-  // 娉ㄥ叆鍒?</body> 涔嬪墠
+  // 注入到 </body> 之前
   const bodyEnd = html.lastIndexOf("</body>");
   if (bodyEnd >= 0) {
     html = html.slice(0, bodyEnd) + patch + "\n" + html.slice(bodyEnd);
@@ -113,7 +117,7 @@ async function injectAiBridge(filePath) {
   }
 
   await writeFile(filePath, html, "utf8");
-  console.log("  鉁?AI 妗ユ帴琛ヤ竵宸叉敞鍏?);
+  console.log("  ✓ AI 桥接补丁已注入");
 }
 
 async function readFile(path) {
@@ -150,17 +154,17 @@ function parseArgs(argv) {
 }
 
 function printUsage() {
-  console.log(`AI HTML Bridge 鈥?鍙鍖?HTML 缂栬緫鍣?+ AI 瀵硅瘽妗ユ帴
+  console.log(`AI HTML Bridge — 可视化 HTML 编辑器 + AI 对话桥接
 
-鐢ㄦ硶:
+用法:
   node scripts/start-editor.mjs <input.html> [options]
 
-鍙傛暟:
-  --out <path>    鑷畾涔夎緭鍑鸿矾寰?(榛樿: <input>.editable.html)
-  --lang <value>  缂栬緫鍣ㄨ瑷€: zh-CN (榛樿) 鎴?en
-  --help          鏄剧ず甯姪
+参数:
+  --out <path>    自定义输出路径 (默认: <input>.editable.html)
+  --lang <value>  编辑器语言: zh-CN (默认) 或 en
+  --help          显示帮助
 
-绀轰緥:
+示例:
   node scripts/start-editor.mjs /path/to/page.html
   node scripts/start-editor.mjs /path/to/page.html --out /tmp/edit.html --lang en`);
 }
