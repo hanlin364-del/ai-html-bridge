@@ -219,15 +219,50 @@ var BRAND_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http:
 '</svg>';
 
 function injectLogoOverride(editor) {
-  if (!editor || !editor.shadow) return false;
+  if (!editor) { console.log('[AI Bridge] logo: no editor'); return false; }
+
+  // 在多个可能的位置查找 .brand-mark（兼容 shadow / 普通 DOM / toolbar）
+  var candidates = [];
+  if (editor.shadow) {
+    if (editor.shadow.querySelector) candidates.push(editor.shadow);
+  }
+  if (editor.toolbar) {
+    // 可能是 ShadowRoot 或普通元素
+    if (editor.toolbar.querySelector) candidates.push(editor.toolbar);
+  }
+  if (editor.host && editor.host.shadowRoot) {
+    candidates.push(editor.host.shadowRoot);
+  }
+  // 备用：直接查 document
+  candidates.push(document);
+
+  var brandMark = null;
+  for (var i = 0; i < candidates.length; i++) {
+    var root = candidates[i];
+    try {
+      brandMark = root.querySelector('.brand-mark');
+      if (brandMark) {
+        console.log('[AI Bridge] logo: found .brand-mark via candidate ' + i);
+        break;
+      }
+    } catch (e) {}
+  }
+
+  if (!brandMark) {
+    console.log('[AI Bridge] logo: .brand-mark not found in any candidate');
+    return false;
+  }
+
   // 如果已注入过，跳过
-  if (editor.shadow.querySelector('[data-logo-override]')) return true;
-  var brandMark = editor.shadow.querySelector('.brand-mark');
-  if (!brandMark) return false;
+  if (brandMark.hasAttribute('data-logo-override')) {
+    return true;
+  }
+
   // 隐藏文字字母 P
   brandMark.textContent = '';
-  brandMark.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;overflow:visible;line-height:1;';
+  brandMark.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;margin:0;overflow:visible;line-height:1;background:transparent !important;color:transparent !important;';
   brandMark.setAttribute('data-logo-override', 'true');
+
   // 插入 SVG
   var parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
   if (parser) {
@@ -235,8 +270,16 @@ function injectLogoOverride(editor) {
     var svgEl = doc.documentElement;
     if (svgEl) {
       brandMark.appendChild(svgEl);
+      console.log('[AI Bridge] logo: SVG injected successfully');
       return true;
+    } else {
+      console.log('[AI Bridge] logo: failed to parse SVG');
     }
+  } else {
+    // 回退：innerHTML
+    brandMark.innerHTML = BRAND_LOGO_SVG;
+    console.log('[AI Bridge] logo: SVG injected via innerHTML fallback');
+    return true;
   }
   return false;
 }
